@@ -1,0 +1,48 @@
+kind: Backup
+apiVersion: velero.io/v1
+metadata:
+  generateName: quay-postgres-backup-
+  namespace: openshift-adp
+  labels:
+    app: quay
+spec:
+  volumeSnapshotLocations:
+    - ${STORAGE}
+  defaultVolumesToFsBackup: true
+  csiSnapshotTimeout: 10m0s
+  ttl: 24h0m0s
+  itemOperationTimeout: 0h5m0s
+  metadata: {}
+  storageLocation: ${STORAGE}
+  hooks:
+    resources:
+      - includedNamespaces:
+          - ${NAMESPACE}
+        labelSelector:
+          matchExpressions:
+            - key: quay-component
+              operator: In
+              values:
+                - postgres
+        name: pg_dump
+        pre:
+          - exec:
+              command:
+                - "rm"
+                - "-f"
+                - "/var/lib/pgsql/backups/pg_dumpall.gz"
+              container: postgres
+              onError: Continue
+              timeout: 10s
+          - exec:
+              command:
+                - "/bin/bash"
+                - "-c"
+                - /usr/bin/pg_dumpall -U postgres -c | /usr/bin/gzip -9 -f > /var/lib/pgsql/backups/pg_dumpall.gz
+              container: postgres
+              onError: Fail
+              timeout: 180s
+  includedNamespaces:
+    - ${NAMESPACE}
+  datamover: kopia
+  snapshotMoveData: true

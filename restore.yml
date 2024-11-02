@@ -1,0 +1,30 @@
+apiVersion: velero.io/v1
+kind: Restore
+metadata:
+  generateName: quay-postgres-backup-
+  namespace: openshift-adp
+spec:
+  hooks:
+    resources:
+      - includedNamespaces:
+          - ${NAMESPACE}
+        labelSelector:
+          matchExpressions:
+            - values:
+                - postgres
+              key: quay-component
+              operator: In
+        postHooks:
+          - exec:
+              command:
+                - "/bin/bash"
+                - "-c"
+                - /usr/bin/zcat /var/lib/pgsql/backups/pg_dumpall.gz | /usr/bin/pg_restore -U postgres
+              container: postgres
+              execTimeout: 180s
+              waitForReady: true
+              onError: Fail
+        name: pg_restore
+  includedNamespaces:
+    - ${NAMESPACE}
+  backupName: quay-postgres-backup-2v9cs
